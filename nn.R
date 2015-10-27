@@ -2,9 +2,11 @@ input_layer_size <- 28 * 28
 hidden_layer_size <- 15
 output_layer_size <- 10
 alfa <- 1
-theta1 <- matrix(rnorm(hidden_layer_size * (input_layer_size + 1)),
+MAX_INPUT <- 256
+
+theta1 <- matrix(runif(hidden_layer_size * (input_layer_size + 1), min = -0.1, max = 0.1),
                           nrow = hidden_layer_size, ncol = input_layer_size + 1)
-theta2 <- matrix(rnorm(output_layer_size * (hidden_layer_size + 1)),
+theta2 <- matrix(runif(output_layer_size * (hidden_layer_size + 1), min = -0.1, max = 0.1),
                  nrow = output_layer_size, ncol = hidden_layer_size + 1)
 
 init <- function(input_size = 28 * 28, hidden_size = 15, output_size = 10, alfa_ = 1, seed = 16) {
@@ -13,15 +15,10 @@ init <- function(input_size = 28 * 28, hidden_size = 15, output_size = 10, alfa_
     output_layer_size <<- output_size
     alfa <<- alfa_
     set.seed(seed)
-    theta1 <- matrix(rnorm(hidden_layer_size * (input_layer_size + 1)),
+    theta1 <- matrix(runif(hidden_layer_size * (input_layer_size + 1), min = -0.1, max = 0.1),
                      nrow = hidden_layer_size, ncol = input_layer_size + 1)
-    theta2 <- matrix(rnorm(output_layer_size * (hidden_layer_size + 1)),
+    theta2 <- matrix(runif(output_layer_size * (hidden_layer_size + 1), min = -0.1, max = 0.1),
                      nrow = output_layer_size, ncol = hidden_layer_size + 1)
-}
-
-weighted_sum <- function(theta, x) {
-    res <- as.numeric(x) * theta
-    sum(res)
 }
 
 sigmoid <- function(x) {
@@ -33,18 +30,20 @@ d_sigmoid <- function(x) {
 }
 
 forward <- function(x) {
-    z_in <- apply(theta1, 1, weighted_sum, x)
+    z_in <- theta1 %*% as.numeric(x)
     z <- sigmoid(z_in)
     z <- c(1, z)
     #forward, hiddent to output
-    y_in <- apply(theta2, 1, weighted_sum, z)
+    y_in <- theta2 %*% z
     y <- sigmoid(y_in)
+    s <- sum(y)
+    y <- lapply(y, '/', s)
     list(y, y_in, z, z_in)
 }
 
 learning <- function(x_in, lbl_in) {
-    for(i in nrow(x_in)) {
-        x <- x_in[i, ]
+    for(i in 1:nrow(x_in)) {
+        x <- x_in[i, ] / MAX_INPUT
         lbl <- lbl_in[i]
         t <- rep(0, output_layer_size)
         if (lbl == 0) lbl <- 10
@@ -52,7 +51,7 @@ learning <- function(x_in, lbl_in) {
         x <- c(1, x)
         #forward, input to hidden
         res <- forward(x)
-        y <- res[[1]]
+        y <- as.numeric(res[[1]])
         y_in <- res[[2]]
         z <- res[[3]]
         z_in <- res[[4]]
@@ -61,7 +60,7 @@ learning <- function(x_in, lbl_in) {
         sigma2 <- (t - y) * d_sigmoid(y_in)
         d_theta2 <- sapply(z, '*', sigma2) * alfa
         
-        sigma_in <- apply(theta2, 2, weighted_sum, sigma2)
+        sigma_in <- t(theta2) %*% sigma2
         sigma1 <- sigma_in[-1] * d_sigmoid(z_in)
         d_theta1 <- sapply(x, '*', sigma1) * alfa
         theta1 <<- theta1 + d_theta1
@@ -70,7 +69,8 @@ learning <- function(x_in, lbl_in) {
 }
 
 predict <- function(x_in) {
-    x <- cbind(1, x_in)
+    x <- c(1, x_in)
+    x <- x / MAX_INPUT
     res <- forward(x)
     which.max(as.numeric(res[[1]]))
 }
